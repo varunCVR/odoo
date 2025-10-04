@@ -28,20 +28,22 @@ export class ExpensesService {
       orderBy: { expense_date: 'desc' },
     });
   }
-  findAllCompany(companyId: number, query: any) {
+  
+  findAllCompany(companyId: number, q: any) {
     return this.prisma.expense.findMany({
       where: {
-        company_id: companyId,
+        company_id: BigInt(companyId),
         expense_date: {
-          gte: query.startDate ? new Date(query.startDate) : undefined,
-          lte: query.endDate ? new Date(query.endDate) : undefined,
+          gte: q.startDate ? new Date(q.startDate) : undefined,
+          lte: q.endDate ? new Date(q.endDate) : undefined,
         },
-        category: query.category || undefined,
+        category: q.category || undefined,
       },
       include: { employee: true, approvals: true },
       orderBy: { expense_date: 'desc' },
     });
   }
+  
   async uploadReceipt(expenseId: number, file: Express.Multer.File, userId: number) {
     if (!file) throw new Error("No file uploaded");
   
@@ -55,6 +57,8 @@ export class ExpensesService {
       },
     });
   }
+  
+  
   async createExpense(userId: number, data: any) {
     const employee = await this.prisma.user.findUnique({
       where: { id: BigInt(userId) },
@@ -64,7 +68,7 @@ export class ExpensesService {
     if (!employee) throw new Error("User not found");
   
     // Company default currency
-    const companyCurrency = employee.company.currency;
+    const companyCurrency = employee.company.default_currency;
   
     // If expense currency ≠ company currency → fetch FX rate
     let fxRateId: bigint | null = null;
