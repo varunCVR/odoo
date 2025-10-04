@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/* ---------- Enums (from SQL intent) ---------- */
+enum ExpenseStatus {
+  DRAFT
+  PENDING
+  PARTIALLY_APPROVED
+  APPROVED
+  REJECTED
+}
+
+enum PaidBy {
+  Self
+  Company
+}
+
+enum ApproverRole {
+  MANAGER
+  FINANCE
+  DIRECTOR
+  CUSTOM
+}
+
+enum HybridLogic {
+  NONE
+  PERCENTAGE
+  SPECIFIC
+  HYBRID
+}
+
+enum Decision {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/* ---------- Core ---------- */
+model Company {
+  id               BigInt       @id @default(autoincrement())
+  name             String       @db.VarChar(120)
+  country_code     String       @db.Char(2)
+  default_currency String       @db.Char(3)
+  created_at       DateTime     @default(now())
+  users            User[]
+  approvalRules    ApprovalRule[]
+  expenses         Expense[]
+  auditLogs        AuditLog[]
+}
+
+model User {
+  id               BigInt            @id @default(autoincrement())
+  company_id       BigInt
+  name             String            @db.VarChar(120)
+  email            String            @db.VarChar(160)
+  password_hash    String            @db.VarChar(255)
+  is_active        Boolean           @default(true) @db.TinyInt
+  created_at       DateTime          @default(now())
+  company          Company           @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  // Roles (M:N)
+  roles            UserRole[]
+
+  // Employee profile + manager back-relations
+  employeeProfile  EmployeeProfile?
+  managedProfiles  EmployeeProfile[] @relation("ManagerProfile")
+
+  // Approvals the user performs
+  approvals        ExpenseApproval[] @relation("UserApprovals")
+
+  // Custom approver assignments in steps
+  approvalSteps    ApprovalStep[]    @relation("CustomApproverSteps")
+
+  approvalSpecifics ApprovalSpecific[]   // back-relation for ApprovalSpecific.user
+  // Receipts uploaded by this user
+  uploadedReceipts Receipt[]         @relation("UploadedReceipts")
+
+  // Expenses created by the user
+  expenses         Expense[]         @relation("EmployeeExpenses")
+
+  @@unique([company_id, email])
+}
+
+model Role {
+  id        Int        @id
+  code      String     @unique
+  userRoles UserRole[]
+}
+
+model UserRole {
+  user_id BigInt
+  role_id Int
+
+  user    User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role    Role @relation(fields: [role_id], references: [id], onDelete: Restrict)
+
+  @@id([user_id, role_id])
+}
+
+/* ---------- Employees & Approvals Config ---------- */
+model EmployeeProfile {
+  user_id               BigInt  @id
+  manager_id            BigInt?
+  require_manager_first Boolean @default(false) @db.TinyInt
+
+  user                  User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  manager               User?   @relation("ManagerProfile", fields: [manager_id], references: [id], onDelete: SetNull)
+}
+
+model ApprovalRule {
+  id                     BigInt        @id @default(autoincrement())
+  company_id             BigInt
+  name                   String        @db.VarChar(120)
+  min_percentage_approve Int?          @db.TinyInt
+  hybrid_logic           HybridLogic   @default(NONE)
+  is_active              Boolean       @default(true) @db.TinyInt
+  created_at             DateTime      @default(now())
+  company                Company       @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  steps                  ApprovalStep[]
+  specifics              ApprovalSpecific[]
+}
+
+model ApprovalStep {
+  id               BigInt        @id @default(autoincrement())
+  rule_id          BigInt
+  step_no          Int
+  approver_role    ApproverRole
+  approver_user_id BigInt?
+
+  rule             ApprovalRule  @relation(fields: [rule_id], references: [id], onDelete: Cascade)
+  approver_user    User?         @relation("CustomApproverSteps", fields: [approver_user_id], references: [id], onDelete: SetNull)
+
+  @@unique([rule_id, step_no])
+}
+
+model ApprovalSpecific {
+  id           BigInt       @id @default(autoincrement())
+  rule_id      BigInt
+  user_id      BigInt
+  auto_approve Boolean      @default(true) @db.TinyInt
+
+  rule         ApprovalRule @relation(fields: [rule_id], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([rule_id, user_id])
+}
+
+/* ---------- FX ---------- */
+model FxRate {
+  id             BigInt   @id @default(autoincrement())
+  base_currency  String   @db.Char(3)
+  quote_currency String   @db.Char(3)
+  rate           Decimal  @db.Decimal(18, 8)
+  quoted_at      DateTime
+
+  expenses       Expense[]
+
+  @@index([base_currency, quote_currency, quoted_at])
+}
+
+/* ---------- Expenses ---------- */
+model Expense {
+  id                BigInt         @id @default(autoincrement())
+  company_id        BigInt
+  employee_id       BigInt
+  status            ExpenseStatus  @default(DRAFT)
+  description       String?        @db.VarChar(500)
+  category          String         @db.VarChar(80)
+  expense_date      DateTime       @db.Date
+  paid_by           PaidBy         @default(Self)
+  amount_original   Decimal        @db.Decimal(18, 2)
+  currency_original String         @db.Char(3)
+  amount_company    Decimal        @db.Decimal(18, 2)
+  currency_company  String         @db.Char(3)
+  fx_rate_id        BigInt?
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
+
+  company           Company        @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  employee          User           @relation("EmployeeExpenses", fields: [employee_id], references: [id], onDelete: Cascade)
+  fx_rate           FxRate?        @relation(fields: [fx_rate_id], references: [id], onDelete: SetNull)
+
+  items             ExpenseItem[]
+  receipts          Receipt[]
+  approvals         ExpenseApproval[]
+
+  @@index([company_id, status])
+  @@index([employee_id, expense_date])
+}
+
+model ExpenseItem {
+  id          BigInt   @id @default(autoincrement())
+  expense_id  BigInt
+  line_desc   String?  @db.VarChar(200)
+  line_amount Decimal  @db.Decimal(18, 2)
+
+  expense     Expense  @relation(fields: [expense_id], references: [id], onDelete: Cascade)
+}
+
+model Receipt {
+  id           BigInt   @id @default(autoincrement())
+  expense_id   BigInt
+  storage_key  String   @db.VarChar(255)
+  filename     String   @db.VarChar(160)
+  mime_type    String   @db.VarChar(80)
+  uploaded_by  BigInt?
+  uploaded_at  DateTime @default(now())
+
+  expense      Expense  @relation(fields: [expense_id], references: [id], onDelete: Cascade)
+  uploader     User?    @relation("UploadedReceipts", fields: [uploaded_by], references: [id], onDelete: SetNull)
+}
+
+model ExpenseApproval {
+  id           BigInt     @id @default(autoincrement())
+  expense_id   BigInt
+  step_no      Int
+  approver_id  BigInt
+  decision     Decision   @default(PENDING)
+  comments     String?    @db.VarChar(500)
+  decided_at   DateTime?
+
+  expense      Expense    @relation(fields: [expense_id], references: [id], onDelete: Cascade)
+  approver     User       @relation("UserApprovals", fields: [approver_id], references: [id], onDelete: Cascade)
+
+  @@unique([expense_id, step_no, approver_id])
+  @@index([expense_id, decision])
+}
+
+/* ---------- Audit ---------- */
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  company_id  BigInt
+  actor_id    BigInt?
+  entity_type String   @db.VarChar(40)
+  entity_id   BigInt
+  action      String   @db.VarChar(40)
+  payload     Json?
+  created_at  DateTime @default(now())
+
+
+  company     Company  @relation(fields: [company_id], references: [id])
+}
