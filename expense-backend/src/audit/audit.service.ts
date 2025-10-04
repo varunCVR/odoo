@@ -1,16 +1,36 @@
-// src/audit/audit.service.ts
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+
 @Injectable()
 export class AuditService {
   constructor(private prisma: PrismaService) {}
 
-  async log(userId: number | null, action: string, entity: string, details?: string) {
+  async log(params: {
+    companyId: number;
+    actorId?: number | null;
+    entityType: string;
+    entityId: number;
+    action: string;
+    payload?: any;
+  }) {
+    const { companyId, actorId, entityType, entityId, action, payload } = params;
+
     return this.prisma.auditLog.create({
       data: {
-        userId: userId ? BigInt(userId) : null,
+        company_id: BigInt(companyId),
+        actor_id: actorId != null ? BigInt(actorId) : null,
+        entity_type: entityType,
+        entity_id: BigInt(entityId),
         action,
-        entity,
-        details,
+        payload,
       },
+    });
+  }
+
+  list(companyId: number) {
+    return this.prisma.auditLog.findMany({
+      where: { company_id: BigInt(companyId) },
+      orderBy: { created_at: 'desc' },
     });
   }
 }

@@ -90,4 +90,13 @@ export class AuthService {
     const { password_hash, ...safeUser } = user as any;
     return { token, user: { ...safeUser, roles } };
   }
+  async forgotPassword(email: string) {
+    // TODO: generate token, send mail
+    return { message: `Password reset link generated for ${email}` };
+  }
+  
+  async resetPassword(token: string, newPassword: string) {
+    // TODO: verify token, set new password
+    return { message: 'Password reset successful' };
+  }
 }

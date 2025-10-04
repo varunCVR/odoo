@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API } from "../api/auth";
+import { API } from "../../api/auth";
 
 export default function ApprovalsInbox() {
   const [pending, setPending] = useState<any[]>([]);

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-type User = { id: number; name: string; role: "ADMIN" | "MANAGER" | "EMPLOYEE" };
+type User = { id: number; name: string; roles: string[] };
 
 type AuthContextType = {
   user: User | null;

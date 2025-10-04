@@ -6,19 +6,11 @@ export default function Dashboard() {
 
   if (!user) return <Navigate to="/login" />;
 
-  // user.roles is coming from backend (e.g. ["ADMIN"], ["EMPLOYEE"], ["MANAGER"])
-  if (user.roles.includes("ADMIN")) {
-    return <Navigate to="/admin" />;
-  }
+  const roles: string[] = Array.isArray(user.roles) ? user.roles : [];
 
-  if (user.roles.includes("MANAGER")) {
-    return <Navigate to="/manager" />;
-  }
+  if (roles.includes("ADMIN")) return <Navigate to="/admin" />;
+  if (roles.includes("MANAGER")) return <Navigate to="/manager" />;
+  if (roles.includes("EMPLOYEE")) return <Navigate to="/employee" />;
 
-  if (user.roles.includes("EMPLOYEE")) {
-    return <Navigate to="/employee" />;
-  }
-
-  // Fallback if no role found
   return <div className="p-6">No dashboard available for your role.</div>;
 }
