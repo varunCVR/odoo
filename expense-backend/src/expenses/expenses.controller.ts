@@ -1,20 +1,28 @@
-import { Controller, Post, Get, Body, Req, UseGuards } from '@nestjs/common';
-import { ExpensesService } from './expenses.service';
+import {
+  Controller,
+  Post,
+  Param,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  Req,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ExpensesService } from './expenses.service';
 
 @Controller('expenses')
 export class ExpensesController {
   constructor(private expensesService: ExpensesService) {}
 
   @UseGuards(JwtAuthGuard)
-  @Post()
-  create(@Req() req, @Body() body: any) {
-    return this.expensesService.create(req.user.sub, req.user.companyId, body);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get('mine')
-  findMine(@Req() req) {
-    return this.expensesService.findMyExpenses(req.user.sub);
+  @Post(':id/receipts')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadReceipt(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req,
+  ) {
+    return this.expensesService.uploadReceipt(Number(id), file, req.user.sub);
   }
 }

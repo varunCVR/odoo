@@ -1,21 +1,24 @@
+import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
-import AdminDashboard from "../features/admin/AdminDashboard.tsx";
-import EmployeeDashboard from "../features/employee/EmployeeDashboard.tsx";
-import ManagerDashboard from "../features/manager/ManagerDashboard.tsx";
 
 export default function Dashboard() {
   const { user } = useAuth();
 
-  if (!user) return <p>Loading...</p>;
+  if (!user) return <Navigate to="/login" />;
 
-  switch (user.role) {
-    case "ADMIN":
-      return <AdminDashboard />;
-    case "MANAGER":
-      return <ManagerDashboard />;
-    case "EMPLOYEE":
-      return <EmployeeDashboard />;
-    default:
-      return <p>No dashboard available</p>;
+  // user.roles is coming from backend (e.g. ["ADMIN"], ["EMPLOYEE"], ["MANAGER"])
+  if (user.roles.includes("ADMIN")) {
+    return <Navigate to="/admin" />;
   }
+
+  if (user.roles.includes("MANAGER")) {
+    return <Navigate to="/manager" />;
+  }
+
+  if (user.roles.includes("EMPLOYEE")) {
+    return <Navigate to="/employee" />;
+  }
+
+  // Fallback if no role found
+  return <div className="p-6">No dashboard available for your role.</div>;
 }
