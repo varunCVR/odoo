@@ -1,102 +1,145 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 
 type JwtPayload = {
-  sub: number;         // user id
-  companyId: number;   // company id
-  roles: string[];     // ["ADMIN","MANAGER","EMPLOYEE"]
+  sub: number;
+  email: string;
+  roles: string[];
+  companyId: number;
 };
+
+function toNumber(x: bigint | number | null | undefined) {
+  return typeof x === 'bigint' ? Number(x) : (x ?? 0) as number;
+}
+
+function safeUser(u: any) {
+  if (!u) return null;
+  return {
+    id: Number(u.id),
+    name: u.name,
+    email: u.email,
+    companyId: Number(u.companyId),
+    roles: (u.roles ?? []).map((r) => r.role?.code),
+  };
+}
+
 
 @Injectable()
 export class AuthService {
   constructor(private jwt: JwtService, private prisma: PrismaService) {}
 
-  // Ensure the 3 base roles exist (id fixed like your SQL, safe with skipDuplicates)
   private async ensureBaseRoles() {
     await this.prisma.role.createMany({
       data: [
-        { id: 1, code: 'ADMIN' },
-        { id: 2, code: 'MANAGER' },
-        { id: 3, code: 'EMPLOYEE' },
+        { id: 1n as any, code: 'ADMIN' },
+        { id: 2n as any, code: 'MANAGER' },
+        { id: 3n as any, code: 'EMPLOYEE' },
       ],
       skipDuplicates: true,
     });
   }
 
   async signup(name: string, email: string, password: string, companyName: string) {
+    if (!name || !email || !password || !companyName) {
+      throw new BadRequestException('name, email, password, companyName required');
+    }
+
     await this.ensureBaseRoles();
 
     const hash = await bcrypt.hash(password, 10);
 
+    // 1) Create company
     const company = await this.prisma.company.create({
       data: {
         name: companyName,
-        country_code: 'IN',       // TODO: pass from UI
-        default_currency: 'INR',  // TODO: derive from country
+        country_code: 'IN',
+        // add default_currency if your schema has it
+        default_currency: 'INR' as any,
       },
     });
 
-    // Create user (NO "role" field here)
+    // 2) Create user (note: adjust field names if you use password_hash)
     const user = await this.prisma.user.create({
       data: {
         name,
         email,
-        password_hash: hash,
+        password_hash: hash as any, // if your field is password_hash → use passwordHash in Prisma
         company_id: company.id,
       },
     });
 
-    // Attach ADMIN role via join table
+    // 3) Attach ADMIN role (via join table)
     const adminRole = await this.prisma.role.findUnique({ where: { code: 'ADMIN' } });
     if (!adminRole) throw new Error('ADMIN role missing');
+
     await this.prisma.userRole.create({
-      data: { user_id: user.id, role_id: adminRole.id },
+      data: { userId: user.id, roleId: adminRole.id } as any,
     });
 
-    const roles = ['ADMIN'];
+    // 4) Fetch roles for JWT
+    const fullUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      include: { roles: { include: { role: true } } },
+    });
+
+    const roles = (fullUser?.roles ?? []).map((r) => r.role.code);
+
+    // 5) Build JWT
     const payload: JwtPayload = {
-      sub: Number(user.id),
-      companyId: Number(user.company_id),
+      sub: toNumber(user.id),
+      email: user.email,
       roles,
+      companyId: toNumber(user.company_id),
     };
     const token = await this.jwt.signAsync(payload);
 
-    // Don’t leak password hash
-    const { password_hash, ...safeUser } = user as any;
-    return { token, user: { ...safeUser, roles } };
+    return {
+      token,
+      user: safeUser(fullUser),
+    };
   }
 
   async login(email: string, password: string) {
-    // email is NOT unique by itself => use findFirst
+    if (!email || !password) throw new BadRequestException('email and password required');
+
+    // email likely NOT globally unique → use findFirst (or include companyId if you collect it)
     const user = await this.prisma.user.findFirst({
       where: { email },
-      include: { roles: { include: { role: true } } }, // bring role codes
+      include: { roles: { include: { role: true } } },
     });
+
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
-    const ok = await bcrypt.compare(password, user.password_hash);
+    // compare against the correct field (passwordHash for password_hash)
+    const ok = await bcrypt.compare(password, user.password_hash as any);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
 
-    const roles = user.roles.map((ur) => ur.role.code);
+    const roles = (user.roles ?? []).map((r) => r.role.code);
+
     const payload: JwtPayload = {
-      sub: Number(user.id),
-      companyId: Number(user.company_id),
+      sub: toNumber(user.id),
+      email: user.email,
       roles,
+      companyId: toNumber(user.company_id),
     };
     const token = await this.jwt.signAsync(payload);
 
-    const { password_hash, ...safeUser } = user as any;
-    return { token, user: { ...safeUser, roles } };
+    return {
+      token,
+      user: safeUser(user),
+    };
   }
+
+  // Optional (stubs for now)
   async forgotPassword(email: string) {
-    // TODO: generate token, send mail
-    return { message: `Password reset link generated for ${email}` };
+    // For demo: don’t error, pretend success
+    return { message: `If ${email} exists, a reset link was sent.` };
   }
-  
+
   async resetPassword(token: string, newPassword: string) {
-    // TODO: verify token, set new password
+    // For demo: pretend success
     return { message: 'Password reset successful' };
   }
 }

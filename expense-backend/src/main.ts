@@ -8,6 +8,9 @@ async function bootstrap() {
     methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
     allowedHeaders: ['Content-Type','Authorization'],
   });
+  (BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
   await app.listen(3000);
 }
 bootstrap();
