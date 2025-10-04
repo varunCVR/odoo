@@ -7,31 +7,32 @@ export class AuthController {
 
   @Post('signup')
   async signup(@Body() body: any) {
-    if (!body.name || !body.email || !body.password || !body.companyName) {
-      throw new BadRequestException('name, email, password, companyName required');
+    const companyName = body.companyName ?? body.company;
+    if (!body.name || !body.email || !body.password || !companyName) {
+      throw new BadRequestException('name, email, password, and company/companyName are required');
     }
-    return this.authService.signup(body.name, body.email, body.password, body.companyName);
+    return this.authService.signup(body.name, body.email, body.password, companyName);
   }
 
   @Post('login')
   async login(@Body() body: any) {
     if (!body.email || !body.password) {
-      throw new BadRequestException('email and password required');
+      throw new BadRequestException('email and password are required');
     }
     return this.authService.login(body.email, body.password);
   }
 
-  @Post('forgot-password')
-  async forgotPassword(@Body() body: { email: string }) {
-    if (!body.email) throw new BadRequestException('email required');
-    return this.authService.forgotPassword(body.email);
-  }
+  // @Post('forgot-password')
+  // async forgotPassword(@Body() body: { email: string }) {
+  //   if (!body.email) throw new BadRequestException('email required');
+  //   return this.authService.forgotPassword(body.email);
+  // }
 
-  @Post('reset-password')
-  async resetPassword(@Body() body: { token: string; newPassword: string }) {
-    if (!body.token || !body.newPassword) {
-      throw new BadRequestException('token and newPassword required');
-    }
-    return this.authService.resetPassword(body.token, body.newPassword);
-  }
+  // @Post('reset-password')
+  // async resetPassword(@Body() body: { token: string; newPassword: string }) {
+  //   if (!body.token || !body.newPassword) {
+  //     throw new BadRequestException('token and newPassword required');
+  //   }
+  //   return this.authService.resetPassword(body.token, body.newPassword);
+  // }
 }

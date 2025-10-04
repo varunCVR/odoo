@@ -11,6 +11,9 @@ async function bootstrap() {
   (BigInt.prototype as any).toJSON = function () {
   return Number(this);
 };
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
   await app.listen(3000);
 }
 bootstrap();
