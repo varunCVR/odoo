@@ -44,4 +44,22 @@ export class ApprovalsService {
       },
     });
   }
+
+  // Approval Rules Management
+  async findAllRules(companyId: number) {
+    return this.prisma.approvalRule.findMany({
+      where: { company_id: BigInt(companyId) },
+      include: { steps: true },
+    });
+  }
+
+  async createRule(companyId: number, name: string) {
+    return this.prisma.approvalRule.create({
+      data: {
+        company_id: BigInt(companyId),
+        name,
+        hybrid_logic: 'NONE',
+      },
+    });
+  }
 }

@@ -4,43 +4,52 @@ import { API } from "../../api/auth";
 export default function ApprovalsInbox() {
   const [pending, setPending] = useState<any[]>([]);
 
-  const fetchPending = async () => {
-    const res = await API.get("/approvals/pending", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    });
-    setPending(res.data);
+  const fetchPending = () => {
+    API.get("/approvals/pending")
+      .then((res) => setPending(res.data))
+      .catch((err) => console.error(err));
   };
 
-  useEffect(() => { fetchPending(); }, []);
+  const handleAction = async (id: number, action: "approve" | "reject") => {
+    try {
+      await API.post(`/approvals/${id}/decision`, { 
+        decision: action === "approve" ? "APPROVED" : "REJECTED" 
+      });
+      fetchPending();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  const handleDecision = async (id: number, decision: "APPROVED" | "REJECTED") => {
-    await API.post(`/approvals/${id}/decision`, { decision }, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    });
+  useEffect(() => {
     fetchPending();
-  };
+  }, []);
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-bold mb-4">Pending Approvals</h1>
-      {pending.length === 0 ? (
-        <p>No pending approvals 🎉</p>
-      ) : (
-        <ul>
-          {pending.map((a) => (
-            <li key={a.id} className="border p-3 mb-2 flex justify-between">
-              <div>
-                <p><b>{a.expense.description}</b></p>
-                <p>{a.expense.amount_company} {a.expense.currency_company}</p>
-              </div>
-              <div>
-                <button onClick={() => handleDecision(a.id, "APPROVED")} className="bg-green-600 text-white px-3 py-1 rounded mr-2">Approve</button>
-                <button onClick={() => handleDecision(a.id, "REJECTED")} className="bg-red-600 text-white px-3 py-1 rounded">Reject</button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <h2 className="text-2xl font-bold mb-4">Approvals Inbox</h2>
+      {pending.map((exp) => (
+        <div key={exp.id} className="border p-4 mb-2 flex justify-between">
+          <div>
+            <p>{exp.description} — {exp.amount} {exp.currency}</p>
+            <p>Status: {exp.status}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="bg-green-500 text-white px-3 py-1 rounded"
+              onClick={() => handleAction(exp.id, "approve")}
+            >
+              Approve
+            </button>
+            <button
+              className="bg-red-500 text-white px-3 py-1 rounded"
+              onClick={() => handleAction(exp.id, "reject")}
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

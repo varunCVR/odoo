@@ -4,110 +4,85 @@ import { API } from "../../api/auth";
 export default function SubmitExpense() {
   const [form, setForm] = useState({
     description: "",
+    amount: "",
+    currency: "INR",
     category: "",
-    expenseDate: "",
-    paidBy: "Self",
-    amountOriginal: 0,
-    currencyOriginal: "INR",
-    amountCompany: 0,
-    currencyCompany: "INR",
   });
   const [file, setFile] = useState<File | null>(null);
+  const [message, setMessage] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
-      // 1. Submit expense
-      const res = await API.post("/expenses", form, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      const expenseId = res.data.id;
+      const formData = new FormData();
+      formData.append("description", form.description);
+      formData.append("amount", form.amount);
+      formData.append("currency", form.currency);
+      formData.append("category", form.category);
+      if (file) formData.append("receipt", file);
 
-      // 2. Upload receipt if selected
-      if (file) {
-        const fd = new FormData();
-        fd.append("file", file);
-        await API.post(`/expenses/${expenseId}/receipts`, fd, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "multipart/form-data",
-          },
-        });
-      }
-
-      alert("Expense submitted with receipt!");
-      setForm({
-        description: "",
-        category: "",
-        expenseDate: "",
-        paidBy: "Self",
-        amountOriginal: 0,
-        currencyOriginal: "INR",
-        amountCompany: 0,
-        currencyCompany: "INR",
+      await API.post("/expenses", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
+
+      setMessage("Expense submitted successfully!");
+      setForm({ description: "", amount: "", currency: "INR", category: "" });
       setFile(null);
-    } catch {
-      alert("Failed to submit expense");
+    } catch (err: any) {
+      setMessage("Failed to submit expense");
+      console.error(err);
     }
   };
 
   return (
     <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-xl font-bold mb-4">Submit Expense</h1>
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <h2 className="text-2xl font-bold mb-4">Submit Expense</h2>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <input
-          className="w-full border p-2"
-          placeholder="Description"
+          name="description"
           value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          onChange={handleChange}
+          placeholder="Description"
+          className="border p-2"
         />
         <input
-          className="w-full border p-2"
-          placeholder="Category"
-          value={form.category}
-          onChange={(e) => setForm({ ...form, category: e.target.value })}
-        />
-        <input
-          type="date"
-          className="w-full border p-2"
-          value={form.expenseDate}
-          onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
+          name="amount"
+          value={form.amount}
+          onChange={handleChange}
+          placeholder="Amount"
+          type="number"
+          className="border p-2"
         />
         <select
-          className="w-full border p-2"
-          value={form.paidBy}
-          onChange={(e) => setForm({ ...form, paidBy: e.target.value })}
+          name="currency"
+          value={form.currency}
+          onChange={handleChange}
+          className="border p-2"
         >
-          <option value="Self">Self</option>
-          <option value="Company">Company</option>
+          <option value="INR">INR</option>
+          <option value="USD">USD</option>
         </select>
         <input
-          type="number"
-          className="w-full border p-2"
-          placeholder="Amount"
-          value={form.amountOriginal}
-          onChange={(e) =>
-            setForm({ ...form, amountOriginal: +e.target.value })
-          }
+          name="category"
+          value={form.category}
+          onChange={handleChange}
+          placeholder="Category"
+          className="border p-2"
         />
-
-        {/* Receipt Upload */}
         <input
           type="file"
-          className="w-full border p-2"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="border p-2"
         />
-
-        {file && (
-          <p className="text-sm text-gray-600">Selected: {file.name}</p>
-        )}
-
-        <button className="w-full bg-blue-600 text-white py-2 rounded">
+        <button type="submit" className="bg-blue-600 text-white p-2 rounded">
           Submit
         </button>
       </form>
+      {message && <p className="mt-4">{message}</p>}
     </div>
   );
 }

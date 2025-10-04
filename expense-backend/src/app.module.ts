@@ -10,6 +10,7 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { AuditModule } from './audit/audit.module';
 import { FxModule } from './fx/fx.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { FxModule } from './fx/fx.module';
     ApprovalsModule,
     AuditModule,
     FxModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

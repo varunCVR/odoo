@@ -18,6 +18,7 @@ import ManagerDashboard from "../pages/manager/ManagerDashboard.tsx";
 import ApprovalsInbox from "../pages/manager/ApprovalsInbox";
 
 import { useAuth } from "../auth/AuthProvider";
+import Navbar from "../components/Navbar";
 
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -28,6 +29,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 export default function AppRoutes() {
   return (
     <BrowserRouter>
+    <Navbar />
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />

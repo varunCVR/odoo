@@ -32,3 +32,20 @@ export class ApprovalsController {
     return this.approvalsService.decide(Number(id), req.user.sub, dec, body.comments);
   }
 }
+
+@Controller('approval-rules')
+export class ApprovalRulesController {
+  constructor(private approvalsService: ApprovalsService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  findAll(@Req() req) {
+    return this.approvalsService.findAllRules(req.user.companyId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  create(@Req() req, @Body() body: { name: string }) {
+    return this.approvalsService.createRule(req.user.companyId, body.name);
+  }
+}
